@@ -1,0 +1,13 @@
+<div class="page-header">
+  <h1>Registro de Asistencia</h1>
+</div>
+
+<p class="hint">Selecciona un alumno o usa el modo QR para registrar su asistencia.</p>
+
+@if (asistenciasService.loading()) {
+  <div class="loading-state">Registrando...</div>
+}
+
+@if (asistenciasService.error()) {
+  <div class="error-state">{{ asistenciasService.error() }}</div>
+}

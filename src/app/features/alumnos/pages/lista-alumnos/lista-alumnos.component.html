@@ -1,0 +1,22 @@
+<div class="page-header">
+  <h1>Alumnos</h1>
+  <span class="badge">{{ alumnosService.total() }} registrados</span>
+</div>
+
+@if (alumnosService.loading()) {
+  <div class="loading-state">Cargando alumnos...</div>
+}
+
+@if (alumnosService.error()) {
+  <div class="error-state">{{ alumnosService.error() }}</div>
+}
+
+@if (!alumnosService.loading() && !alumnosService.error()) {
+  <div class="alumnos-grid">
+    @for (alumno of alumnosService.alumnos(); track alumno.id) {
+      <app-alumno-card [alumno]="alumno" />
+    } @empty {
+      <p class="empty-state">No hay alumnos registrados.</p>
+    }
+  </div>
+}

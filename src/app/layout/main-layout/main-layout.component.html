@@ -1,0 +1,25 @@
+<nav class="sidebar">
+  <div class="brand">
+    <span class="brand-icon">🏋️</span>
+    <span class="brand-name">MOVIMENT</span>
+  </div>
+
+  <ul class="nav-links">
+    <li>
+      <a routerLink="/alumnos" routerLinkActive="active">
+        <span class="nav-icon">👥</span>
+        <span>Alumnos</span>
+      </a>
+    </li>
+    <li>
+      <a routerLink="/asistencias" routerLinkActive="active">
+        <span class="nav-icon">✅</span>
+        <span>Asistencias</span>
+      </a>
+    </li>
+  </ul>
+</nav>
+
+<main class="main-content">
+  <router-outlet />
+</main>

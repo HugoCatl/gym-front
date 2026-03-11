@@ -1,0 +1,66 @@
+<!-- Pantalla principal alumno — un solo objetivo por pantalla -->
+<div class="flex-1 flex flex-col items-center justify-center p-8 gap-8">
+
+  <!-- Saludo -->
+  <div class="text-center">
+    <p class="text-stone-400 text-sm font-bold uppercase tracking-widest">Hola,</p>
+    <h2 class="text-3xl font-black uppercase italic text-stone-900">
+      {{ auth.usuario()?.nombre?.split(' ')?.[0] ?? 'Alumno' }}
+    </h2>
+  </div>
+
+  <!-- Tarjeta próxima clase con toques premium (sombras dinámicas) -->
+  <div class="relative w-full rounded-5xl text-white text-center shadow-2xl p-1 bg-gradient-to-b from-stone-800 to-stone-900 group">
+    <!-- Glow backgroud pseudo-element -->
+    <div class="absolute -inset-1 bg-gradient-to-r from-oliva to-grupo-manana rounded-5xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+    
+    <div class="relative w-full bg-stone-900 rounded-[2.5rem] p-8 overflow-hidden z-10">
+      
+      <!-- Fondo con pattern ligero / gradiente sutil -->
+      <div class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
+
+      <p class="section-label text-stone-500 mb-4 tracking-[0.3em]">Próxima sesión</p>
+
+      <div class="mb-6 inline-block bg-stone-800/50 backdrop-blur-md px-4 py-2 rounded-full border border-stone-700/50">
+        <span class="text-sm font-black uppercase tracking-widest flex items-center gap-2"
+          [style.color]="proximaClase.color">
+          <span class="w-2 h-2 rounded-full" [style.background-color]="proximaClase.color"></span>
+          {{ proximaClase.grupo }}
+        </span>
+      </div>
+
+      <p class="text-3xl font-black uppercase italic drop-shadow-md">
+        {{ proximaClase.dia }}, {{ proximaClase.fecha }}
+      </p>
+      <p class="text-oliva text-xl font-black mt-2 tracking-wide drop-shadow-md">
+        de {{ proximaClase.horario }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Botón gigante Premium -->
+  @if (!apuntado()) {
+    <button
+      (click)="apuntarse()"
+      class="w-full py-7 rounded-5xl text-2xl tracking-tight btn-gradient-oliva"
+      style="letter-spacing: -0.02em;"
+    >
+      <span class="relative z-10 flex items-center justify-center gap-3">
+        ¡Me apunto! 
+        <span class="text-3xl animate-bounce">🙋🏽‍♂️</span>
+      </span>
+    </button>
+  } @else {
+    <div
+      class="w-full py-7 rounded-5xl text-2xl tracking-tight btn-success"
+    >
+      ✅ ¡Genial! Te esperamos
+    </div>
+  }
+
+  <!-- Hint mejorado -->
+  <p class="text-stone-400 text-[10px] font-bold text-center uppercase tracking-[0.2em] opacity-60">
+    Pulsa el botón para confirmar tu plaza
+  </p>
+
+</div>

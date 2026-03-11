@@ -1,0 +1,23 @@
+<div class="alumno-card">
+  <div class="alumno-header">
+    <span class="short-id">{{ alumno().short_id }}</span>
+    <span class="grupo">{{ alumno().grupo }}</span>
+  </div>
+
+  <h3 class="alumno-nombre">{{ alumno().nombre }}</h3>
+  <p class="alumno-dni">{{ alumno().dni }}</p>
+
+  <div class="alumno-badges">
+    @if (alumno().med_paper) {
+      <span class="badge badge-ok">Med ✓</span>
+    } @else {
+      <span class="badge badge-warn">Med ✗</span>
+    }
+
+    @if (alumno().consent_paper) {
+      <span class="badge badge-ok">Consentimiento ✓</span>
+    } @else {
+      <span class="badge badge-warn">Consentimiento ✗</span>
+    }
+  </div>
+</div>

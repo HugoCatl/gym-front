@@ -1,0 +1,121 @@
+<div class="p-6 md:p-10 space-y-8">
+
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <p class="section-label">Gestión</p>
+      <h1 class="text-3xl font-black italic uppercase text-stone-900 tracking-tight">Alumnos</h1>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="bg-stone-900 text-white text-xs font-black px-4 py-2 rounded-full uppercase tracking-widest">
+        {{ alumnosService.total() }} registrados
+      </span>
+    </div>
+  </div>
+
+  <!-- Búsqueda -->
+  <div class="relative">
+    <svg class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+    <input
+      type="text"
+      placeholder="Buscar por nombre, DNI o ID..."
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+      class="w-full pl-14 pr-5 py-4 bg-white border border-stone-200 rounded-2xl
+             font-bold text-sm outline-none focus:ring-2 focus:ring-oliva
+             placeholder:text-stone-400 uppercase tracking-wide"
+    />
+  </div>
+
+  <!-- Loading -->
+  @if (alumnosService.loading()) {
+    <div class="card p-10 text-center">
+      <svg class="animate-spin h-8 w-8 text-oliva mx-auto" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      <p class="text-stone-400 text-xs font-bold uppercase tracking-widest mt-4">Cargando alumnos...</p>
+    </div>
+  }
+
+  <!-- Error -->
+  @if (alumnosService.error()) {
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-6 py-4 text-sm font-bold">
+      {{ alumnosService.error() }}
+    </div>
+  }
+
+  <!-- Grupos -->
+  @if (!alumnosService.loading() && !alumnosService.error()) {
+    @for (grupo of grupos(); track grupo) {
+      @let alumnos = alumnosPorGrupo(grupo);
+      @if (alumnos.length > 0 || !busqueda()) {
+        <div class="space-y-3">
+          <!-- Grupo header -->
+          <div class="flex items-center gap-3">
+            <span class="w-3 h-3 rounded-full" [style.background-color]="colorGrupo(grupo)"></span>
+            <h2 class="text-sm font-black uppercase tracking-widest" [style.color]="colorGrupo(grupo)">
+              {{ grupo }}
+            </h2>
+            <span class="text-stone-400 text-xs font-bold">({{ alumnos.length }})</span>
+          </div>
+
+          <!-- Lista alumnos -->
+          @for (alumno of alumnos; track alumno.id) {
+            <a
+              [routerLink]="[alumno.id]"
+              class="card flex items-center justify-between px-6 py-4
+                     hover:border-stone-400 hover:shadow-md transition-all duration-200 block"
+            >
+              <!-- Left -->
+              <div class="flex items-center gap-4">
+                <!-- Avatar ID -->
+                <div class="w-11 h-11 rounded-full bg-stone-900 border-2 flex items-center justify-center
+                            font-black text-[11px]"
+                  [style.border-color]="colorGrupo(alumno.grupo)"
+                  [style.color]="colorGrupo(alumno.grupo)"
+                >
+                  {{ alumno.short_id }}
+                </div>
+                <!-- Info -->
+                <div>
+                  <p class="font-black text-stone-900 uppercase text-sm tracking-wide">{{ alumno.nombre }}</p>
+                  <div class="flex items-center gap-3 mt-0.5">
+                    <span class="text-stone-400 text-[11px] font-bold tracking-widest">{{ alumno.dni }}</span>
+                    <!-- Docs -->
+                    <span class="text-[11px] font-black"
+                      [class.text-green-500]="alumno.med_paper"
+                      [class.text-red-400]="!alumno.med_paper"
+                      title="Certificado médico">
+                      ⚕ {{ alumno.med_paper ? '✓' : '✗' }}
+                    </span>
+                    <span class="text-[11px] font-black"
+                      [class.text-green-500]="alumno.consent_paper"
+                      [class.text-red-400]="!alumno.consent_paper"
+                      title="Consentimiento informado">
+                      🛡 {{ alumno.consent_paper ? '✓' : '✗' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: arrow -->
+              <svg class="w-5 h-5 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </a>
+          } @empty {
+            <div class="card px-6 py-8 text-center">
+              <p class="text-stone-400 text-xs font-bold uppercase tracking-widest">
+                No hay alumnos en este grupo
+              </p>
+            </div>
+          }
+        </div>
+      }
+    }
+  }
+
+</div>

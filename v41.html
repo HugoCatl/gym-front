@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOVIMENT VIVER - Gestión de Gimnasio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        .bg-oliva { background-color: #6b705c; }
+        .text-oliva { color: #6b705c; }
+        .border-oliva { border-color: #6b705c; }
+        .hover-oliva:hover { background-color: #585d4d; }
+        
+        .group-manana { border-color: #22c55e !important; color: #22c55e !important; }
+        .group-tarde { border-color: #3b82f6 !important; color: #3b82f6 !important; }
+        .group-mujeres { border-color: #d946ef !important; color: #d946ef !important; }
+
+        .animate-spin-slow { animation: spin 3s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .success-flash { animation: flashGreen 0.8s ease-out; }
+        @keyframes flashGreen { 0% { background-color: #22c55e; } 100% { background-color: #f5f5f4; } }
+        .error-flash { animation: flashRed 0.8s ease-out; }
+        @keyframes flashRed { 0% { background-color: #ef4444; } 100% { background-color: #f5f5f4; } }
+        details summary::-webkit-details-marker { display: none; }
+        .custom-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: #6b705c; }
+        .bar-mini { width: 6px; background: #e5e7eb; border-radius: 10px; transition: all 0.5s; }
+        .bar-mini.active { background: #6b705c; }
+    </style>
+</head>
+<body class="bg-stone-100 transition-colors duration-500 font-sans">
+    <div id="root"></div>
+
+    <div id="modalAlumno" class="hidden fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300" id="modalContent"></div>
+    </div>
+
+    <script>
+        let students = JSON.parse(localStorage.getItem('gym_students')) || [];
+        let attendances = JSON.parse(localStorage.getItem('gym_attendances')) || [];
+        let currentTab = 'scan';
+        let viewDate = new Date();
+        let selectedDay = null;
+        let searchTerm = '';
+        let editingId = null;
+        let selectedForPrint = [];
+
+        const groupColors = {
+            "Adultos mañanas": "#22c55e",
+            "Adultos tarde": "#3b82f6",
+            "Mujeres tarde": "#d946ef"
+        };
+
+        function save() {
+            localStorage.setItem('gym_students', JSON.stringify(students));
+            localStorage.setItem('gym_attendances', JSON.stringify(attendances));
+            render(currentTab);
+        }
+
+        function validarDNI(dni) {
+            const letras = "TRWAGMYFPDXBNJZSQVHLCKE";
+            if (!/^\d{8}[A-Z]$/i.test(dni)) return false;
+            const numero = parseInt(dni.substring(0, 8), 10);
+            const letra = dni.substring(8).toUpperCase();
+            return letra === letras.charAt(numero % 23);
+        }
+
+        function toggleDoc(id, field) {
+            const idx = students.findIndex(s => s.id === id);
+            students[idx][field] = !students[idx][field];
+            save();
+            verFicha(id);
+        }
+
+        function verFicha(id) {
+            const s = students.find(x => x.id === id);
+            if (!s.consentPaper) s.consentPaper = false;
+
+            const totalAsis = attendances.filter(a => a.studentName === s.name).length;
+            const mesActual = new Date().getMonth();
+            const asisMes = attendances.filter(a => a.studentName === s.name && new Date(a.date).getMonth() === mesActual).length;
+            
+            const mesesLabels = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+            const statsMeses = mesesLabels.map((m, i) => attendances.filter(a => a.studentName === s.name && new Date(a.date).getMonth() === i).length);
+            const maxVal = Math.max(...statsMeses, 1);
+
+            document.getElementById('modalContent').innerHTML = `
+                <div class="p-8 bg-stone-900 text-white flex justify-between items-center">
+                    <div>
+                        <span style="color: ${groupColors[s.group]}" class="font-black text-xl">#${s.shortId}</span>
+                        <h2 class="text-2xl font-black uppercase italic">${s.name}</h2>
+                    </div>
+                    <button onclick="cerrarFicha()" class="text-stone-400 hover:text-white"><i data-lucide="x"></i></button>
+                </div>
+                <div class="p-8 space-y-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-stone-50 p-6 rounded-3xl border border-stone-100">
+                            <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1">Este Mes</p>
+                            <p class="text-4xl font-black" style="color: ${groupColors[s.group]}">${asisMes}</p>
+                        </div>
+                        <div class="bg-stone-50 p-6 rounded-3xl border border-stone-100">
+                            <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1">Total</p>
+                            <p class="text-4xl font-black text-stone-800">${totalAsis}</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest text-center">Documentación Obligatoria</p>
+                        
+                        <div class="flex items-center justify-between p-4 rounded-2xl ${s.medPaper ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'} transition-all">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="${s.medPaper ? 'stethoscope' : 'alert-circle'}" class="${s.medPaper ? 'text-green-600' : 'text-red-500'}" size="20"></i>
+                                <div>
+                                    <p class="text-[11px] font-black uppercase">Certificado Médico</p>
+                                    <p class="text-[9px] font-bold opacity-60">${s.medPaper ? 'VIGENTE' : 'PENDIENTE'}</p>
+                                </div>
+                            </div>
+                            <button onclick="toggleDoc('${s.id}', 'medPaper')" class="text-[10px] font-black uppercase w-16 py-2 rounded-xl shadow-sm border border-stone-200 transition-colors ${s.medPaper ? 'bg-green-600 text-white border-green-700' : 'bg-white text-red-500'}">
+                                ${s.medPaper ? 'ON' : 'OFF'}
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-2xl ${s.consentPaper ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'} transition-all">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="${s.consentPaper ? 'shield-check' : 'shield-alert'}" class="${s.consentPaper ? 'text-green-600' : 'text-red-500'}" size="20"></i>
+                                <div>
+                                    <p class="text-[11px] font-black uppercase">Consentimiento Informado</p>
+                                    <p class="text-[9px] font-bold opacity-60">${s.consentPaper ? 'FIRMADO' : 'NO FIRMADO'}</p>
+                                </div>
+                            </div>
+                            <button onclick="toggleDoc('${s.id}', 'consentPaper')" class="text-[10px] font-black uppercase w-16 py-2 rounded-xl shadow-sm border border-stone-200 transition-colors ${s.consentPaper ? 'bg-green-600 text-white border-green-700' : 'bg-white text-red-500'}">
+                                ${s.consentPaper ? 'ON' : 'OFF'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-4 text-center">Actividad Anual</p>
+                        <div class="flex items-end justify-between h-12 px-2">
+                            ${statsMeses.map((v, i) => `
+                                <div class="flex flex-col items-center gap-1">
+                                    <div class="bar-mini ${v > 0 ? 'active' : ''}" style="height: ${(v/maxVal)*30 + 4}px; ${v > 0 ? 'background-color:'+groupColors[s.group] : ''}"></div>
+                                    <span class="text-[8px] font-bold text-stone-300">${mesesLabels[i]}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            document.getElementById('modalAlumno').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function cerrarFicha() { document.getElementById('modalAlumno').classList.add('hidden'); }
+
+        function toggleSelectStudent(id) {
+            if (selectedForPrint.includes(id)) {
+                selectedForPrint = selectedForPrint.filter(i => i !== id);
+            } else {
+                selectedForPrint.push(id);
+            }
+            const btn = document.querySelector('button[onclick="imprimirSeleccionados()"]');
+            if(btn) btn.innerHTML = `<i data-lucide="printer" size="16"></i> Imprimir Selección (${selectedForPrint.length})`;
+            lucide.createIcons();
+        }
+
+        // FUNCIÓN CORREGIDA PARA ESCANEO QR
+        function handleScan(code) {
+            if(!code) return;
+            // Limpieza de caracteres extraños y espacios
+            const inputStr = code.trim().toUpperCase();
+            
+            // Búsqueda flexible (DNI, MOV-DNI, ID Corto o QR exacto)
+            const student = students.find(s => 
+                s.qrCode.toUpperCase() === inputStr || 
+                s.qrCode.toUpperCase() === 'MOV-' + inputStr || 
+                s.shortId.toUpperCase() === inputStr || 
+                s.dni.toUpperCase() === inputStr ||
+                inputStr.includes(s.dni.toUpperCase())
+            );
+
+            const resDiv = document.getElementById('scanResult');
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            
+            if (student) {
+                if (attendances.some(a => a.studentName === student.name && a.date === todayStr)) {
+                    resDiv.innerHTML = `<div class="bg-amber-100 text-amber-800 p-6 rounded-3xl text-center border-2 border-amber-200"><i data-lucide="clock" class="mx-auto mb-2 text-amber-600"></i><p class="font-black italic">YA ANOTADO HOY</p></div>`;
+                } else {
+                    document.body.classList.add('success-flash');
+                    setTimeout(() => document.body.classList.remove('success-flash'), 800);
+                    confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 }, colors: [groupColors[student.group] || '#6b705c', '#ffffff'] });
+                    attendances.unshift({ 
+                        studentName: student.name, 
+                        group: student.group, 
+                        date: todayStr, 
+                        fullTimestamp: now.getTime(), 
+                        timestamp: now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) 
+                    });
+                    resDiv.innerHTML = `<div style="background-color: ${groupColors[student.group]}" class="text-white p-8 rounded-[2.5rem] shadow-2xl text-center"><i data-lucide="check-circle-2" class="mx-auto mb-2 w-12 h-12"></i><p class="text-3xl font-black italic uppercase">¡HOLA, ${student.name.split(' ')[0]}!</p></div>`;
+                    save();
+                }
+            } else {
+                document.body.classList.add('error-flash');
+                setTimeout(() => document.body.classList.remove('error-flash'), 800);
+                resDiv.innerHTML = `<div class="bg-red-600 text-white p-6 rounded-3xl text-center font-black">NO ENCONTRADO</div>`;
+            }
+            lucide.createIcons();
+            setTimeout(() => { if(resDiv && currentTab === 'scan') resDiv.innerHTML = ''; }, 4000);
+        }
+
+        function render(tab = 'scan') {
+            currentTab = tab;
+            const root = document.getElementById('root');
+            let content = `<div class="min-h-screen p-4 md:p-8"><div class="max-w-6xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-stone-200"><div class="p-8 bg-stone-900 text-stone-100 flex flex-col md:flex-row justify-between items-center gap-6"><h1 class="text-3xl font-black tracking-tighter italic uppercase">MOVIMENT <span class="text-oliva">VIVER</span><span class="text-[10px] align-top ml-1 text-stone-500 not-italic font-medium">’26</span></h1><div class="flex gap-2 bg-stone-800 p-2 rounded-[1.5rem] font-bold text-xs"><button onclick="render('scan')" class="px-6 py-3 rounded-2xl transition-all ${tab==='scan'?'bg-oliva text-white shadow-lg':'text-stone-400 hover:text-white'} uppercase tracking-widest">Escanear</button><button onclick="render('students')" class="px-6 py-3 rounded-2xl transition-all ${tab==='students'?'bg-oliva text-white shadow-lg':'text-stone-400 hover:text-white'} uppercase tracking-widest">Alumnos (${students.length})</button><button onclick="render('stats')" class="px-6 py-3 rounded-2xl transition-all ${tab==='stats'?'bg-oliva text-white shadow-lg':'text-stone-400 hover:text-white'} uppercase tracking-widest">Historial</button></div></div><div class="p-8 md:p-12">`;
+
+            if (tab === 'scan') {
+                const now = new Date().getTime();
+                const todayStr = new Date().toISOString().split('T')[0];
+                const recents = attendances.filter(a => a.date === todayStr && (now - (a.fullTimestamp || 0)) < 1800000);
+                content += `<div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                    <div class="lg:col-span-2 text-center lg:border-r lg:border-stone-100 lg:pr-12">
+                        <div class="w-20 h-20 bg-stone-50 rounded-full flex items-center justify-center mx-auto mb-6"><i data-lucide="aperture" class="text-oliva w-10 h-10 animate-spin-slow"></i></div>
+                        <input type="text" id="pistolaInput" autofocus class="w-full p-8 border-4 border-stone-100 rounded-[2.5rem] text-center text-5xl focus:border-oliva outline-none shadow-inner uppercase font-black" placeholder="ID / QR" onkeypress="if(event.key==='Enter'){ handleScan(this.value); this.value=''; }">
+                        <div id="scanResult" class="mt-8 min-h-[160px] flex items-center justify-center"></div>
+                    </div>
+                    <div class="bg-stone-50 p-8 rounded-[2.5rem] border border-stone-200">
+                        <div class="flex items-center justify-between mb-8">
+                            <h3 class="text-xs font-black text-oliva uppercase tracking-widest flex items-center gap-2">
+                                <span class="relative flex h-3 w-3"><span class="animate-ping absolute h-full w-full rounded-full bg-oliva opacity-75"></span><span class="relative h-3 w-3 rounded-full bg-oliva"></span></span> EN CLASE
+                            </h3>
+                            <span class="bg-stone-200 text-stone-600 text-[10px] font-black px-3 py-1 rounded-full italic">${recents.length}</span>
+                        </div>
+                        <div class="space-y-4">${recents.map(a => `<div class="bg-white p-5 rounded-2xl border-l-4 shadow-sm animate-in slide-in-from-right-4" style="border-color: ${groupColors[a.group]}"><p class="text-[9px] font-black uppercase" style="color: ${groupColors[a.group]}">${a.timestamp} • ${a.group}</p><p class="font-black text-stone-800 uppercase text-sm">${a.studentName}</p></div>`).join('')}</div>
+                    </div>
+                </div>`;
+            } else if (tab === 'students') {
+                content += `
+                <div class="flex flex-col md:flex-row gap-4 mb-8">
+                    <button onclick="exportBackup()" class="flex-1 bg-stone-800 text-stone-100 p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"><i data-lucide="download-cloud" size="16"></i> Backup</button>
+                    <button onclick="imprimirSeleccionados()" class="flex-1 bg-oliva text-white p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg"><i data-lucide="printer" size="16"></i> Imprimir Selección (${selectedForPrint.length})</button>
+                    <label class="flex-1 bg-stone-100 text-stone-600 p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer border-2 border-dashed border-stone-300"><i data-lucide="upload-cloud" size="16"></i> Cargar<input type="file" class="hidden" accept=".json" onchange="importBackup(event)"></label>
+                </div>
+                <div class="bg-stone-50 p-8 rounded-[2.5rem] mb-10 border border-stone-200 grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <input type="text" id="nameInp" placeholder="Nombre completo" class="p-4 bg-white rounded-2xl border border-stone-300 font-bold uppercase outline-none focus:ring-2 focus:ring-oliva">
+                    <input type="text" id="dniInp" placeholder="DNI" class="p-4 bg-white rounded-2xl border border-stone-300 font-bold outline-none">
+                    <input type="number" id="birthInp" placeholder="Año Nac." class="p-4 bg-white rounded-2xl border border-stone-300 font-bold outline-none">
+                    <select id="groupInp" class="p-4 bg-white rounded-2xl border border-stone-300 font-bold uppercase"><option>Adultos mañanas</option><option>Adultos tarde</option><option>Mujeres tarde</option></select>
+                    <button id="btnSubmit" onclick="addOrUpdateStudent()" class="bg-oliva text-white rounded-2xl font-black uppercase text-xs shadow-xl">Añadir</button>
+                </div>
+                <div class="relative mb-8"><i data-lucide="search" class="absolute left-6 top-1/2 -translate-y-1/2 text-stone-400" size="20"></i><input type="text" placeholder="BUSCAR ALUMNO..." value="${searchTerm}" oninput="searchTerm=this.value.toLowerCase(); render('students')" class="w-full pl-16 pr-6 py-4 bg-stone-50 rounded-2xl border-none outline-none font-bold text-xs uppercase tracking-widest shadow-inner"></div>
+                <div class="space-y-6">`;
+                
+                Object.keys(groupColors).forEach(g => {
+                    const filtered = students.filter(s => s.group === g && (s.name.toLowerCase().includes(searchTerm) || s.dni.includes(searchTerm))).sort((a,b) => a.name.localeCompare(b.name));
+                    content += `<details class="group bg-stone-50 rounded-[2rem] border border-stone-200" ${searchTerm ? 'open' : ''}><summary class="list-none p-6 cursor-pointer flex justify-between items-center"><h3 class="font-black text-sm uppercase flex items-center gap-3" style="color: ${groupColors[g]}"><span class="w-3 h-3 rounded-full" style="background-color: ${groupColors[g]}"></span> ${g} (${filtered.length})</h3><i data-lucide="chevron-down" class="group-open:rotate-180 transition-transform text-stone-400"></i></summary><div class="px-6 pb-6 grid gap-3">${filtered.map(s => {
+                        const mesActual = new Date().getMonth();
+                        const asisMes = attendances.filter(a => a.studentName === s.name && new Date(a.date).getMonth() === mesActual).length;
+                        return `
+                        <div class="flex items-center justify-between p-5 bg-white border border-stone-100 rounded-3xl shadow-sm hover:border-stone-300 transition-all">
+                            <div class="flex items-center gap-4">
+                                <input type="checkbox" class="custom-checkbox" style="accent-color: ${groupColors[s.group]}" ${selectedForPrint.includes(s.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleSelectStudent('${s.id}')">
+                                <div onclick="verFicha('${s.id}')" class="cursor-pointer">
+                                    <div class="flex items-center gap-3">
+                                        <div class="bg-stone-900 w-10 h-10 rounded-full flex items-center justify-center font-black text-[10px] border-2" style="color: ${groupColors[s.group]}; border-color: ${groupColors[s.group]}">#${s.shortId}</div>
+                                        <div>
+                                            <p class="font-black text-stone-800 text-sm uppercase">${s.name}</p>
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-[8px] font-black text-stone-400 tracking-widest">${s.dni}</span>
+                                                <i data-lucide="stethoscope" class="${s.medPaper ? 'text-green-500' : 'text-red-400'}" size="11"></i>
+                                                <i data-lucide="shield-check" class="${s.consentPaper ? 'text-green-500' : 'text-red-400'}" size="11"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <div class="text-center">
+                                    <p class="text-[7px] font-black text-stone-300 uppercase">Mes</p>
+                                    <p class="text-sm font-black leading-none" style="color: ${groupColors[s.group]}">${asisMes}</p>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button onclick="imprimirCarnet('${s.name}', '${s.qrCode}', '${s.group}', '${s.shortId}', '${s.dni}')" class="p-2 text-stone-400 hover:text-stone-800"><i data-lucide="printer" size="18"></i></button>
+                                    <button onclick="verFicha('${s.id}')" class="p-2 text-stone-400 hover:text-stone-800"><i data-lucide="eye" size="18"></i></button>
+                                    <button onclick="prepareEdit('${s.id}')" class="p-2 text-stone-400 hover:text-blue-600"><i data-lucide="user-cog" size="18"></i></button>
+                                    <button onclick="if(confirm('¿Borrar?')){students=students.filter(x=>x.id!=='${s.id}'); save();}" class="p-2 text-stone-400 hover:text-red-500"><i data-lucide="trash-2" size="18"></i></button>
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('')}</div></details>`;
+                });
+                content += `</div>`;
+            } else if (tab === 'stats') {
+                content += `<div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-10"><div class="flex items-center gap-6"><button onclick="viewDate.setMonth(viewDate.getMonth()-1); render('stats')" class="p-3 bg-stone-100 rounded-full hover:bg-stone-200 transition-all"><i data-lucide="chevron-left"></i></button><h2 class="text-2xl font-black text-stone-800 uppercase italic tracking-tighter">${new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(viewDate)}</h2><button onclick="viewDate.setMonth(viewDate.getMonth()+1); render('stats')" class="p-3 bg-stone-100 rounded-full hover:bg-stone-200 transition-all"><i data-lucide="chevron-right"></i></button></div><button onclick="exportToExcel()" class="bg-oliva text-white px-8 py-4 rounded-[1.5rem] text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-2xl hover-oliva"><i data-lucide="file-spreadsheet" size="18"></i> Exportar Excel</button></div><div class="calendar-grid text-center mb-10">${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => `<div class="text-[10px] font-black text-stone-400 uppercase py-4">${d}</div>`).join('')}${Array(new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay() === 0 ? 6 : new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay() - 1).fill('').map(() => `<div></div>`).join('')}${Array.from({length: new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate()}, (_, i) => { 
+                    const d = i + 1; const ds = `${viewDate.getFullYear()}-${String(viewDate.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; 
+                    const count = attendances.filter(a => a.date === ds).length; 
+                    return `<div onclick="selectedDay='${ds}'; render('stats')" class="p-4 cursor-pointer rounded-2xl border transition-all ${selectedDay === ds ? 'bg-oliva text-white shadow-xl scale-110 z-10' : 'bg-stone-50 border-stone-100 hover:bg-stone-200'}"><div class="text-sm font-black">${d}</div><div class="text-[10px] font-bold opacity-60">${count || ''}</div></div>`; 
+                }).join('')}</div>`;
+                if (selectedDay) {
+                    const daily = attendances.filter(a => a.date === selectedDay);
+                    const groupsInDay = [...new Set(daily.map(a => a.group))];
+                    content += `<div class="mt-12 p-8 bg-stone-900 rounded-[2.5rem] text-stone-100 shadow-2xl"><h3 class="text-xs font-black uppercase tracking-[0.3em] text-oliva mb-8">Asistencias del ${selectedDay.split('-').reverse().join('/')}</h3>`;
+                    groupsInDay.length > 0 ? groupsInDay.forEach(gn => {
+                        const groupList = daily.filter(a => a.group === gn);
+                        content += `<details class="group bg-stone-800 rounded-3xl overflow-hidden mb-4" open><summary class="list-none p-5 cursor-pointer flex justify-between items-center hover:bg-stone-700 transition-all"><div class="flex items-center gap-4"><span class="font-black uppercase text-xs tracking-widest" style="color: ${groupColors[gn]}">${gn}</span><span class="bg-stone-900 px-3 py-1 rounded-full text-[10px] font-black" style="color: ${groupColors[gn]}">${groupList.length}</span></div><i data-lucide="chevron-down" class="group-open:rotate-180 transition-transform text-stone-500"></i></summary><div class="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 border-t border-stone-700">${groupList.map(a => `<div class="bg-stone-900/50 p-3 rounded-xl border border-stone-700 flex justify-between items-center"><span class="text-xs font-bold uppercase truncate pr-2">${a.studentName}</span><span class="text-[9px] font-black" style="color: ${groupColors[a.group]}">${a.timestamp}</span></div>`).join('')}</div></details>`;
+                    }) : content += `<p class="text-stone-500 text-xs italic text-center py-10 uppercase tracking-widest font-black">No hay registros</p>`;
+                    content += `</div>`;
+                }
+            }
+            content += `</div></div></div>`;
+            root.innerHTML = content;
+            lucide.createIcons();
+            if(tab === 'scan') {
+                const inp = document.getElementById('pistolaInput');
+                if(inp) inp.focus();
+            }
+        }
+
+        function getNextAvailableId(name) {
+            const initial = name.charAt(0).toUpperCase();
+            const allNumbers = students.map(s => {
+                const match = s.shortId.match(/\d+/);
+                return match ? parseInt(match[0]) : 0;
+            });
+            const maxNumber = allNumbers.length > 0 ? Math.max(...allNumbers) : 0;
+            return initial + (maxNumber + 1);
+        }
+
+        function addOrUpdateStudent() {
+            const nameInp = document.getElementById('nameInp');
+            const dniInp = document.getElementById('dniInp');
+            const birthInp = document.getElementById('birthInp');
+            const groupInp = document.getElementById('groupInp');
+
+            const name = nameInp.value.trim();
+            const dni = dniInp.value.trim().toUpperCase();
+            const birth = birthInp.value.trim();
+            const group = groupInp.value;
+
+            if(!name || !dni || !birth) {
+                alert("Faltan datos");
+                return;
+            }
+
+            if (!validarDNI(dni)) {
+                const seguir = confirm("El DNI no parece correcto (letra mal o faltan números). ¿Quieres guardarlo así de todas formas?");
+                if (!seguir) return;
+            }
+
+            if (editingId) {
+                const idx = students.findIndex(s => s.id === editingId);
+                students[idx] = { ...students[idx], name, dni, birthYear: birth, group };
+                editingId = null;
+                const b = document.getElementById('btnSubmit');
+                b.innerText = "Añadir";
+                b.classList.replace('bg-blue-600', 'bg-oliva');
+            } else {
+                students.push({ 
+                    id: Date.now().toString(), 
+                    shortId: getNextAvailableId(name), 
+                    name, 
+                    dni, 
+                    birthYear: birth, 
+                    group, 
+                    qrCode: `MOV-${dni}`, 
+                    medPaper: false,
+                    consentPaper: false 
+                });
+            }
+            
+            nameInp.value = "";
+            dniInp.value = "";
+            birthInp.value = "";
+            
+            save();
+        }
+
+        function prepareEdit(id) {
+            const s = students.find(x => x.id === id); if(!s) return;
+            editingId = id;
+            document.getElementById('nameInp').value = s.name;
+            document.getElementById('dniInp').value = s.dni;
+            document.getElementById('birthInp').value = s.birthYear;
+            document.getElementById('groupInp').value = s.group;
+            const b = document.getElementById('btnSubmit'); b.innerText = "OK"; b.classList.replace('bg-oliva', 'bg-blue-600');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function generateCardHtml(s, i, color) {
+            return `
+            <div class="card" style="border-color: ${color}">
+                <div class="sidebar" style="background-color: ${color}"></div>
+                <div class="content">
+                    <div class="bg-watermark">2026</div>
+                    <div class="header">
+                        <div>
+                            <span class="brand" style="color: ${color}">MOVIMENT</span>
+                            <span class="brand-sub">📍 Viver (Castellón)</span>
+                        </div>
+                        <div class="id-badge" style="color: ${color}; border-color: ${color}33;">#${s.shortId}</div>
+                    </div>
+                    <div class="user-info">
+                        <div class="name">${s.name}</div>
+                        <div class="dni-label">DNI: ${s.dni}</div>
+                    </div>
+                    <div class="footer">
+                        <div class="group-pill" style="color: ${color}; border-color: ${color}">${s.group}</div>
+                        <div id="q-${i}" class="qr-wrap"></div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        const commonCardStyles = `
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+            body { font-family: 'Inter', sans-serif; margin: 0; background: #f0f0f0; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+            .card { width: 85.6mm; height: 53.98mm; background: #111; color: white; border-radius: 12px; overflow: hidden; position: relative; display: flex; border: 3px solid; box-shadow: 0 10px 20px rgba(0,0,0,0.2); page-break-inside: avoid; margin-bottom: 10px; }
+            .sidebar { width: 14px; height: 100%; }
+            .content { flex: 1; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; }
+            .brand { font-weight: 900; font-size: 16px; font-style: italic; letter-spacing: -0.5px; }
+            .brand-sub { font-size: 8px; color: white; opacity: 0.6; display: block; font-style: normal; letter-spacing: 1px; margin-top: 2px; }
+            .id-badge { background: rgba(255,255,255,0.08); padding: 4px 10px; border-radius: 8px; font-weight: 900; font-size: 12px; border: 1px solid; }
+            .user-info { margin-top: 5px; }
+            
+            .name { 
+                font-size: 15px; 
+                line-height: 1.1;
+                font-weight: 800; 
+                text-transform: uppercase; 
+                margin: 0; 
+                letter-spacing: -0.2px; 
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+
+            .dni-label { font-size: 9px; color: #777; font-weight: 600; margin-top: 2px; }
+            .footer { display: flex; justify-content: space-between; align-items: flex-end; }
+            .group-pill { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid; padding-bottom: 2px; }
+            .qr-wrap { background: white; padding: 4px; border-radius: 6px; display: flex; }
+            .bg-watermark { position: absolute; right: -5px; top: 30%; font-size: 60px; font-weight: 900; color: rgba(255,255,255,0.02); transform: rotate(-90deg); pointer-events: none; text-transform: uppercase; }
+        `;
+
+        function imprimirCarnet(nombre, qr, grupo, sid, dni) {
+            const color = groupColors[grupo] || '#6b705c';
+            const w = window.open('','','width=600,height=600');
+            const studentObj = { name: nombre, qrCode: qr, group: grupo, shortId: sid, dni: dni };
+            
+            w.document.write(`<html><head><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><style>
+                ${commonCardStyles}
+                body { justify-content: center; height: 100vh; background: #eee; }
+            </style></head><body>
+            ${generateCardHtml(studentObj, "single", color)}
+            <script>new QRCode(document.getElementById("q-single"),{text:"${qr}",width:65,height:65,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.H});setTimeout(()=>{window.print();window.close();},800);<\/script></body></html>`);
+        }
+
+        function imprimirSeleccionados() {
+            if (selectedForPrint.length === 0) return alert("Selecciona alumnos.");
+            const lista = students.filter(s => selectedForPrint.includes(s.id));
+            const w = window.open('','','width=900,height=900');
+            
+            let cardsHtml = lista.map((s, i) => {
+                const color = groupColors[s.group] || '#6b705c';
+                return generateCardHtml(s, i, color);
+            }).join('');
+
+            w.document.write(`<html><head><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><style>
+                ${commonCardStyles}
+                .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10mm; }
+                @media print { body { padding: 0; background: white; } .grid { gap: 5mm; } }
+            </style></head><body><div class="grid">${cardsHtml}</div>
+            <script>
+                ${lista.map((s, i) => `new QRCode(document.getElementById("q-${i}"),{text:"${s.qrCode}",width:60,height:60,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.H});`).join('\n')}
+                setTimeout(()=>{ window.print(); window.close(); }, 1000);
+            <\/script></body></html>`);
+        }
+
+        function exportBackup() {
+            const blob = new Blob([JSON.stringify({students, attendances}, null, 2)], {type: 'application/json'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `MOVIMENT_BACKUP_2026.json`; a.click();
+        }
+        function importBackup(e) {
+            const f = e.target.files[0]; if(!f) return;
+            const r = new FileReader(); r.onload = (ex) => {
+                const d = JSON.parse(ex.target.result);
+                if(confirm("¿Cargar datos? Se borrarán los actuales.")){ students=d.students; attendances=d.attendances; save(); }
+            }; r.readAsText(f);
+        }
+        function exportToExcel() {
+            if(!attendances.length) return;
+            const wb = XLSX.utils.book_new();
+            const grps = Object.keys(groupColors);
+            const byDate = {};
+            attendances.forEach(a => { if(!byDate[a.date]) byDate[a.date]=[]; byDate[a.date].push(a); });
+            Object.keys(byDate).sort().reverse().forEach(d => {
+                const day = byDate[d]; const rows = [grps];
+                const max = Math.max(...grps.map(g => day.filter(x=>x.group===g).length));
+                for(let i=0; i<max; i++){ rows.push(grps.map(g => { const list = day.filter(x=>x.group===g); return list[i] ? `${list[i].timestamp} - ${list[i].studentName}` : ""; })); }
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), d);
+            });
+            XLSX.writeFile(wb, `MOVIMENT_EXCEL_2026.xlsx`);
+        }
+
+        render();
+        document.addEventListener('click', (e) => { 
+            if(currentTab==='scan' && e.target.id !== 'pistolaInput') { 
+                const i=document.getElementById('pistolaInput'); if(i) i.focus(); 
+            }
+            if(e.target.id === 'modalAlumno') cerrarFicha();
+        });
+    </script>
+</body>
+</html>
