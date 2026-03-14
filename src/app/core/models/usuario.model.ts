@@ -6,6 +6,13 @@ export interface Usuario {
   dni: string;
   rol: UserRole;
   grupo?: string; // solo para alumnos
+  sexo?: string;
+  edad?: number;
+  telefono?: string;
+  consentimientoDatos?: boolean;
+  consentimientoFotos?: boolean;
+  consentimientoRiesgos?: boolean;
+  onboardingCompletado?: boolean;
 }
 
 export interface LoginRequest {

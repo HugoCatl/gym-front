@@ -32,7 +32,12 @@ export class AuthService {
         if (usuario.rol === 'coach') {
           this.router.navigate(['/coach/dashboard']);
         } else {
-          this.router.navigate(['/alumno/clase']);
+          // Si no ha completado el onboarding o directamente es undefined (false por defecto)
+          if (usuario.onboardingCompletado === false || usuario.onboardingCompletado === undefined) {
+            this.router.navigate(['/alumno/onboarding']);
+          } else {
+            this.router.navigate(['/alumno/clase']);
+          }
         }
       },
       error: (err) => {
@@ -51,6 +56,14 @@ export class AuthService {
   private _setUsuario(usuario: Usuario): void {
     this._usuario.set(usuario);
     localStorage.setItem('moviment_user', JSON.stringify(usuario));
+  }
+
+  // Permite actualizar campos de la sesión actual (ej: onboardingCompletado)
+  actualizarSesion(cambios: Partial<Usuario>): void {
+    const act = this._usuario();
+    if (act) {
+      this._setUsuario({ ...act, ...cambios });
+    }
   }
 
   private _loadFromStorage(): Usuario | null {

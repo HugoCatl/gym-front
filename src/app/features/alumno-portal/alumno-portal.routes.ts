@@ -16,6 +16,13 @@ export const alumnoPortalRoutes: Routes = [
             (m) => m.ProximaClaseComponent
           ),
       },
+      {
+        path: 'onboarding',
+        loadComponent: () =>
+          import('./pages/onboarding/onboarding.component').then(
+            (m) => m.OnboardingComponent
+          ),
+      },
     ],
   },
 ];
