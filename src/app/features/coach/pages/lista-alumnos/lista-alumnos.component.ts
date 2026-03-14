@@ -21,8 +21,25 @@ export class ListaAlumnosComponent implements OnInit {
   readonly alumnosService = inject(AlumnosService);
   readonly busqueda = signal('');
 
+  // Formulario nuevo alumno
+  readonly mostrandoFormulario = signal(false);
+  readonly nuevoAlumno = signal<Partial<Alumno>>({ 
+    nombre: '', 
+    dni: '', 
+    grupo: '',
+    rol: 'alumno' // Necesario para el backend
+  } as Partial<Alumno> & { rol: string });
+
   readonly grupoColors = GRUPO_COLORS;
   readonly grupos = computed(() => Object.keys(GRUPO_COLORS));
+
+  crearAlumno(): void {
+    const data = this.nuevoAlumno();
+    if (!data.nombre || !data.dni) return;
+    this.alumnosService.crearAlumno(data);
+    this.mostrandoFormulario.set(false);
+    this.nuevoAlumno.set({ nombre: '', dni: '', grupo: '', rol: 'alumno' } as any);
+  }
 
   readonly alumnosFiltrados = computed(() => {
     const term = this.busqueda().toLowerCase().trim();

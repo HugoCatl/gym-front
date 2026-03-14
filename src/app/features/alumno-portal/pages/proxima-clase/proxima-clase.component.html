@@ -21,20 +21,26 @@
 
       <p class="section-label text-stone-500 mb-4 tracking-[0.3em]">Próxima sesión</p>
 
-      <div class="mb-6 inline-block bg-stone-800/50 backdrop-blur-md px-4 py-2 rounded-full border border-stone-700/50">
-        <span class="text-sm font-black uppercase tracking-widest flex items-center gap-2"
-          [style.color]="proximaClase.color">
-          <span class="w-2 h-2 rounded-full" [style.background-color]="proximaClase.color"></span>
-          {{ proximaClase.grupo }}
-        </span>
-      </div>
+      @if (proximaClase()) {
+        <div class="mb-6 inline-block bg-stone-800/50 backdrop-blur-md px-4 py-2 rounded-full border border-stone-700/50">
+          <span class="text-sm font-black uppercase tracking-widest flex items-center gap-2"
+            [style.color]="proximaClase()?.color || '#22c55e'">
+            <span class="w-2 h-2 rounded-full" [style.background-color]="proximaClase()?.color || '#22c55e'"></span>
+            {{ proximaClase()?.grupo || 'General' }}
+          </span>
+        </div>
 
-      <p class="text-3xl font-black uppercase italic drop-shadow-md">
-        {{ proximaClase.dia }}, {{ proximaClase.fecha }}
-      </p>
-      <p class="text-oliva text-xl font-black mt-2 tracking-wide drop-shadow-md">
-        de {{ proximaClase.horario }}
-      </p>
+        <p class="text-3xl font-black uppercase italic drop-shadow-md">
+          {{ proximaClase()?.titulo || proximaClase()?.fecha }}
+        </p>
+        <p class="text-oliva text-xl font-black mt-2 tracking-wide drop-shadow-md">
+          {{ proximaClase()?.fecha }} {{ proximaClase()?.horario ? 'de ' + proximaClase()?.horario : '' }}
+        </p>
+      } @else {
+        <p class="text-xl font-black uppercase italic drop-shadow-md pb-6 text-stone-400">
+           No hay clases próximamente
+        </p>
+      }
     </div>
   </div>
 

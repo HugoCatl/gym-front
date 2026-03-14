@@ -1,5 +1,6 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { AuthService } from '../../../../core/services/auth.service';
+import { ClasesService, Clase } from '../../../../core/services/clases.service';
 
 @Component({
   selector: 'app-proxima-clase',
@@ -8,22 +9,37 @@ import { AuthService } from '../../../../core/services/auth.service';
   templateUrl: './proxima-clase.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ProximaClaseComponent {
+export class ProximaClaseComponent implements OnInit {
   readonly auth = inject(AuthService);
-  readonly apuntado = signal(false);
+  readonly clasesSvc = inject(ClasesService);
 
-  // Próxima clase calculada (hardcoded por ahora — se conectará al backend)
-  readonly proximaClase = {
-    dia: 'Martes',
-    fecha: '11 de marzo',
-    horario: '10:00 a 11:00',
-    grupo: 'Adultos mañanas',
-    color: '#22c55e',
-  };
+  readonly proximaClase = computed<Clase | null>(() => {
+    const clases = this.clasesSvc.clases();
+    if (clases.length === 0) return null;
+    return clases[0];
+  });
+
+  readonly apuntado = computed(() => {
+    const pc = this.proximaClase();
+    if (!pc || !pc.id) return false;
+    const reservas = this.clasesSvc.reservas();
+    return reservas.some(r => String(r.clase_id) === String(pc.id));
+  });
+
+  ngOnInit() {
+    this.clasesSvc.cargarClases();
+    const ui = this.auth.usuario()?.id;
+    if (ui) {
+      this.clasesSvc.cargarReservas(ui);
+    }
+  }
 
   apuntarse(): void {
     if (this.apuntado()) return;
-    this.apuntado.set(true);
-    // TODO: llamar al endpoint POST /asistencias
+    const pc = this.proximaClase();
+    const ui = this.auth.usuario()?.id;
+    if (pc && pc.id && ui) {
+      this.clasesSvc.reservarClase(ui, pc.id);
+    }
   }
 }

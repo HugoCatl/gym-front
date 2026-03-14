@@ -30,11 +30,12 @@ export class FichaAlumnoComponent implements OnInit {
   }
 
   toggleDoc(campo: 'med_paper' | 'consent_paper'): void {
-    // TODO: conectar con el endpoint PUT /alumnos/:id
     const alumno = this.alumno();
     if (!alumno) return;
-    console.log('Toggle', campo, 'para alumno', alumno.id);
-    // Por ahora solo log — el backend implementará el endpoint
+    const nuevoValor = !alumno[campo];
+    this.alumnosService.actualizarAlumno(alumno.id, {
+      [campo]: nuevoValor
+    });
   }
 
   ngOnInit(): void {

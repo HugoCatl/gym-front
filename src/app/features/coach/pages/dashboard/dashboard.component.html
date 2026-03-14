@@ -9,6 +9,10 @@
       </h1>
     </div>
     <div class="flex gap-3">
+      <button (click)="mostrandoFormulario.set(!mostrandoFormulario())"
+        class="bg-stone-900 text-white hover:bg-stone-800 transition-colors inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-black text-sm uppercase tracking-wide">
+        <span>+</span> Nueva Clase
+      </button>
       <a routerLink="../alumnos"
         class="btn-oliva inline-flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -19,6 +23,36 @@
       </a>
     </div>
   </div>
+
+  @if (mostrandoFormulario()) {
+    <div class="card p-6 bg-stone-50 border-2 border-stone-200 animate-fade-in-up">
+      <h3 class="text-lg font-black uppercase tracking-tight text-stone-900 mb-4">Añadir Sesión</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1">Título / Grupo</label>
+          <input type="text" [(ngModel)]="nuevaClase().titulo" placeholder="Ej: Movilidad" class="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:ring-2 focus:ring-stone-900" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1">Fecha</label>
+          <input type="date" [(ngModel)]="nuevaClase().fecha" class="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:ring-2 focus:ring-stone-900" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1">Horario (opcional)</label>
+          <input type="text" [(ngModel)]="nuevaClase().horario" placeholder="Ej: 10:00 - 11:00" class="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:ring-2 focus:ring-stone-900" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1">Color HEX (opcional)</label>
+          <input type="text" [(ngModel)]="nuevaClase().color" placeholder="#22c55e" class="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:ring-2 focus:ring-stone-900" />
+        </div>
+      </div>
+      <div class="mt-4 flex gap-3 justify-end">
+        <button (click)="mostrandoFormulario.set(false)" class="text-xs font-black uppercase text-stone-500 hover:text-stone-900 px-4 py-2">Cancelar</button>
+        <button (click)="crearClase()" [disabled]="!nuevaClase().titulo || !nuevaClase().fecha" class="bg-oliva text-white hover:bg-stone-800 transition-colors disabled:opacity-50 text-xs font-black px-6 py-2 rounded-full uppercase tracking-widest">
+          Crear Clase
+        </button>
+      </div>
+    </div>
+  }
 
   <!-- Stats rápidas -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -50,14 +84,14 @@
   <div>
     <p class="section-label mb-4">Clases programadas hoy</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      @for (clase of clasesHoy; track clase.grupo) {
-        <div class="card p-6 border-l-4" [style.border-left-color]="clase.color">
+      @for (clase of clasesHoy(); track clase.id) {
+        <div class="card p-6 border-l-4" [style.border-left-color]="clase.color || '#22c55e'">
           <div class="flex items-start justify-between">
             <div>
-              <p class="text-sm font-black uppercase" [style.color]="clase.color">
-                {{ clase.grupo }}
+              <p class="text-sm font-black uppercase" [style.color]="clase.color || '#22c55e'">
+                {{ clase.grupo || clase.titulo }}
               </p>
-              <p class="text-2xl font-black text-stone-900 mt-1">{{ clase.hora }}</p>
+              <p class="text-2xl font-black text-stone-900 mt-1">{{ clase.horario || clase.fecha }}</p>
             </div>
             <!-- Indicador live -->
             <span class="flex items-center gap-2 text-[10px] font-black text-oliva uppercase tracking-widest">
