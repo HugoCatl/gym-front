@@ -25,8 +25,8 @@ export class AuthService {
 
     this.http.post<any>(`${environment.apiUrl}/login`, { dni, password }).subscribe({
       next: (res) => {
-        // Asumiendo que `res` es el usuario o `{ usuario: ... }`.
-        const usuario: Usuario = res.usuario || res;
+        // La API devuelve { status: 'success', user: { ... } }
+        const usuario: Usuario = res.user || res.usuario || res;
         this._setUsuario(usuario);
         this._loading.set(false);
         if (usuario.rol === 'coach') {
@@ -45,7 +45,7 @@ export class AuthService {
   logout(): void {
     this._usuario.set(null);
     localStorage.removeItem('moviment_user');
-    this.router.navigate(['/login']);
+    this.router.navigate(['/auth/login']);
   }
 
   private _setUsuario(usuario: Usuario): void {
